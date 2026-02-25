@@ -13,12 +13,23 @@ authRouter.post("/signup", async (req, res) => {
         }
 
         const { firstName, lastName, email, password, bio, age, gender, skills, profilePicture } = req.body;
+        const userExists = await User.findOne({ email: email });
+        if (userExists) {
+            return res.status(400).json({ message: "User already exists" });
+        }
 
         const passwordHash = await bcrypt.hash(password, 10);
         const user = new User({ firstName, lastName, email, password: passwordHash, bio, age, gender, skills, profilePicture });
 
-        await user.save();
-        res.status(201).json({ message: "User registered successfully" });
+        const savedUser = await user.save();
+        const token = savedUser.generateToken();
+        res.cookie("token", token, {
+            httpOnly: true,
+            secure: true,
+            sameSite: "strict",
+            expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        });
+        res.status(201).json({ message: "User registered successfully", data: savedUser });
     } catch (error) {
         res.status(400).json({ message: "User registration failed", error });
     }
