@@ -12,7 +12,7 @@ const cors = require("cors");
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
-    origin: ["http://localhost:5173", "https://13.61.12.3:3000/", "https://13.61.12.3/"],
+    origin: ["http://localhost:5173", "http://13.61.12.3:3000", "http://13.61.12.3"],
     credentials: true
 }));
 
