@@ -7,6 +7,7 @@ const profileRouter = require("./Routes/profile");
 const requestRouter = require("./Routes/request");
 const userRouter = require("./Routes/user");
 const cors = require("cors");
+require("dotenv").config();
 
 // middleware to parse json
 app.use(express.json());
@@ -24,8 +25,8 @@ app.use("/api/user", userRouter);
 connectDB()
     .then(() => {
         console.log("MongoDB connected");
-        app.listen(3000, () => {
-            console.log("Server is running on port 3000");
+        app.listen(process.env.PORT, () => {
+            console.log(`Server is running on port ${process.env.PORT}`);
         });
     }).catch((error) => {
         console.log(error);
