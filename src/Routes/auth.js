@@ -4,6 +4,8 @@ const User = require("../models/user");
 const validator = require("validator");
 const bcrypt = require("bcrypt");
 const { validateSignUpData } = require("../utils/validation");
+const { sendVerificationEmail } = require("../utils/email");
+const crypto = require("crypto");
 
 authRouter.post("/signup", async (req, res) => {
     try {
@@ -19,17 +21,31 @@ authRouter.post("/signup", async (req, res) => {
         }
 
         const passwordHash = await bcrypt.hash(password, 10);
-        const user = new User({ firstName, lastName, email, password: passwordHash, bio, age, gender, skills, profilePicture });
+        
+        // Generate Verification Token
+        const verificationToken = crypto.randomBytes(32).toString("hex");
+        const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+        const user = new User({ 
+            firstName, 
+            lastName, 
+            email, 
+            password: passwordHash, 
+            bio, 
+            age, 
+            gender, 
+            skills, 
+            profilePicture,
+            verificationToken,
+            verificationTokenExpires
+        });
 
         const savedUser = await user.save();
-        const token = savedUser.generateToken();
-        res.cookie("token", token, {
-            httpOnly: true,
-            secure: false, // Changed from true to false: since you're using HTTP, secure must be false
-            sameSite: "strict", // can also be "lax" based on your needs
-            expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        });
-        res.status(201).json({ message: "User registered successfully", data: savedUser });
+        
+        // Send Verification Email
+        await sendVerificationEmail(savedUser.email, verificationToken);
+
+        res.status(201).json({ message: "User registered successfully. Please check your email to verify your account." });
     } catch (error) {
         res.status(400).json({ message: "User registration failed", error });
     }
@@ -46,6 +62,10 @@ authRouter.post("/login", async (req, res) => {
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
+
+        if (!user.isVerified) {
+            return res.status(401).json({ message: "Please verify your email before logging in. Check your inbox." });
+        }
         const isPasswordValid = await user.comparePassword(password);
         if (isPasswordValid) {
             const token = user.generateToken();
@@ -61,6 +81,33 @@ authRouter.post("/login", async (req, res) => {
         }
     } catch (error) {
         res.status(400).json({ message: "Login failed", error });
+    }
+});
+
+authRouter.get("/verify/:token", async (req, res) => {
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    try {
+        const { token } = req.params;
+
+        const user = await User.findOne({
+            verificationToken: token,
+            verificationTokenExpires: { $gt: Date.now() }, // Token must not be expired
+        });
+
+        if (!user) {
+            return res.redirect(`${frontendUrl}/verify?status=error&message=Verification+link+is+invalid+or+has+expired`);
+        }
+
+        user.isVerified = true;
+        user.verificationToken = undefined;
+        user.verificationTokenExpires = undefined;
+
+        await user.save();
+
+        res.redirect(`${frontendUrl}/verify?status=success&message=Email+verified+successfully`);
+    } catch (error) {
+        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+        res.redirect(`${frontendUrl}/verify?status=error&message=Email+verification+failed`);
     }
 });
 

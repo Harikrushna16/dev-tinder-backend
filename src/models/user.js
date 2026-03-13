@@ -66,6 +66,16 @@ const userSchema = new mongoose.Schema({
             message: "Please provide a valid URL"
         }
     },
+    isVerified: {
+        type: Boolean,
+        default: false,
+    },
+    verificationToken: {
+        type: String,
+    },
+    verificationTokenExpires: {
+        type: Date,
+    },
 },
     {
         timestamps: true,
